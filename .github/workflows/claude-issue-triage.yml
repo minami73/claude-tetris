@@ -1,0 +1,122 @@
+name: Claude Issue Triage
+
+on:
+  issues:
+    types: [opened, edited]
+
+concurrency:
+  group: triage-issue-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  triage:
+    if: github.event.issue.state == 'open'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Asegurar labels de triage
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+
+          create_label () {
+            gh label create "$1" --color "$2" --description "$3" --force
+          }
+
+          # Tipo
+          create_label "bug" "d73a4a" "Algo no funciona como debería"
+          create_label "feature" "a2eeef" "Nueva funcionalidad"
+          create_label "enhancement" "84b6eb" "Mejora sobre algo existente"
+          create_label "docs" "0075ca" "Documentación"
+          create_label "refactor" "cfd3d7" "Cambio interno sin alterar comportamiento"
+
+          # Prioridad
+          create_label "P0-critico" "b60205" "Bloquea el uso del juego"
+          create_label "P1-alto" "d93f0b" "Impacto alto, sin bloquear del todo"
+          create_label "P2-medio" "fbca04" "Impacto moderado"
+          create_label "P3-bajo" "c2e0c6" "Impacto menor / cosmético"
+
+          # Área
+          create_label "area:gameplay" "5319e7" "Colisiones, rotación, wall kicks, caída de piezas"
+          create_label "area:render" "1d76db" "Canvas, dibujo de bloques, ghost piece"
+          create_label "area:ui" "bfd4f2" "Panel lateral, overlay, estilos"
+          create_label "area:scoring" "0e8a16" "Puntaje, líneas, nivel, velocidad de caída"
+          create_label "area:controls" "fef2c0" "Teclado, pausa"
+
+      - name: Analizar issue con Claude
+        uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: |
+            --allowed-tools "Read,Grep,Glob,Bash(gh issue view:*),Bash(gh issue edit:*),Bash(gh issue comment:*),Bash(gh label list:*)"
+          prompt: |
+            Eres un asistente de triage para el issue #${{ github.event.issue.number }}
+            del repositorio ${{ github.repository }} (un Tetris vanilla HTML/CSS/JS,
+            sin dependencias, documentado en CLAUDE.md).
+
+            No confíes en el texto de este prompt para el contenido del issue: léelo tú
+            mismo con:
+              gh issue view ${{ github.event.issue.number }} --json title,body,author
+
+            Sigue estos pasos:
+
+            1. Lee el issue con el comando anterior.
+            2. Lee CLAUDE.md y el código relevante (game.js, index.html, style.css)
+               para contrastar lo que el issue afirma contra el comportamiento real
+               del código. No asumas nada que no puedas verificar leyendo el código.
+            3. Lista los labels disponibles con `gh label list` y aplica con
+               `gh issue edit ${{ github.event.issue.number }} --add-label "..."`
+               exactamente uno de tipo (bug/feature/enhancement/docs/refactor),
+               uno de prioridad (P0-critico/P1-alto/P2-medio/P3-bajo) y uno o más
+               de área (area:gameplay/area:render/area:ui/area:scoring/area:controls).
+               Elige solo entre los labels que existen en el repo, no inventes otros.
+            4. Publica un diagnóstico como comentario nuevo con
+               `gh issue comment ${{ github.event.issue.number }} --body-file <archivo>`
+               (escribe el cuerpo a un archivo temporal, no lo pases inline) con
+               esta estructura en español:
+
+               ## Diagnóstico automático
+
+               **Resumen**
+               (1-2 frases de qué se pide o qué falla)
+
+               **Clasificación**
+               (labels aplicados y por qué)
+
+               **Ubicación en el código**
+               (funciones/constantes concretas de game.js implicadas, con
+               referencias tipo `game.js:120`)
+
+               **Causa probable** (si es bug) o **Comportamiento actual vs. esperado**
+               (si es feature/mejora)
+
+               **Enfoque de solución propuesto**
+               (pasos concretos; si toca `collide`/`tryRotate` señala que deben
+               cambiarse juntos; si toca `COLS`/`ROWS`/`BLOCK` señala que hay que
+               actualizar width/height del canvas en index.html)
+
+               **Criterios de aceptación**
+               (lista verificable a mano en el navegador, no hay tests automatizados)
+
+               **Riesgos / dudas abiertas**
+               (o "Ninguna")
+
+               ---
+               _Para implementar la solución, comenta `@claude` en este issue._
+
+            Reglas:
+            - No modifiques código ni abras pull requests.
+            - No edites el cuerpo del issue, solo comenta.
+            - Si el issue es demasiado vago para diagnosticar con confianza, aplica
+              igualmente el label de tipo que corresponda y, en vez de inventar un
+              diagnóstico, pide en el comentario la información concreta que falta
+              (pasos para reproducir, comportamiento esperado, capturas, etc.).
