@@ -116,6 +116,9 @@ jobs:
             Reglas:
             - No modifiques código ni abras pull requests.
             - No edites el cuerpo del issue, solo comenta.
+            - El comentario debe estar en formato Markdown que GitHub pueda
+              renderizar correctamente (encabezados con `#`, negritas con `**`,
+              listas, bloques de código con backticks, etc.).
             - Si el issue es demasiado vago para diagnosticar con confianza, aplica
               igualmente el label de tipo que corresponda y, en vez de inventar un
               diagnóstico, pide en el comentario la información concreta que falta
