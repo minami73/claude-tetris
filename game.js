@@ -39,8 +39,10 @@ const overlay = document.getElementById('overlay');
 const overlayTitle = document.getElementById('overlay-title');
 const overlayScore = document.getElementById('overlay-score');
 const restartBtn = document.getElementById('restart-btn');
+const themeToggleBtn = document.getElementById('theme-toggle');
 
 let board, current, next, score, lines, level, paused, gameOver, lastTime, dropAccum, dropInterval, animId;
+let gridColor, highlightColor;
 
 function createBoard() {
   return Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
@@ -163,13 +165,13 @@ function drawBlock(context, x, y, colorIndex, size, alpha) {
   context.fillStyle = color;
   context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2);
   // highlight
-  context.fillStyle = 'rgba(255,255,255,0.12)';
+  context.fillStyle = highlightColor;
   context.fillRect(x * size + 1, y * size + 1, size - 2, 4);
   context.globalAlpha = 1;
 }
 
 function drawGrid() {
-  ctx.strokeStyle = '#22222e';
+  ctx.strokeStyle = gridColor;
   ctx.lineWidth = 0.5;
   for (let c = 1; c < COLS; c++) {
     ctx.beginPath();
@@ -300,5 +302,25 @@ document.addEventListener('keydown', e => {
 });
 
 restartBtn.addEventListener('click', init);
+
+function readThemeColors() {
+  const styles = getComputedStyle(document.body);
+  gridColor = styles.getPropertyValue('--grid-color').trim();
+  highlightColor = styles.getPropertyValue('--highlight-color').trim();
+}
+
+function applyTheme(theme) {
+  document.body.classList.toggle('light-theme', theme === 'light');
+  themeToggleBtn.textContent = theme === 'light' ? '☀️' : '🌙';
+  readThemeColors();
+}
+
+themeToggleBtn.addEventListener('click', () => {
+  const theme = document.body.classList.contains('light-theme') ? 'dark' : 'light';
+  localStorage.setItem('theme', theme);
+  applyTheme(theme);
+});
+
+applyTheme(localStorage.getItem('theme') === 'light' ? 'light' : 'dark');
 
 init();
